@@ -506,7 +506,7 @@ preFinal <- data.frame(ID = Test$ID, lwage = test_baked$.pred)
 
 test_bakedFinal$.pred <- predict(final_fit, 
                            new_data = test_bakedFinal)
-preFinal <- data.frame(ID = Test$ID, lwage = test_bakedFinal$.pred)
+Final <- data.frame(ID = Test$ID, lwage = test_bakedFinal$.pred)
 ```
 
 

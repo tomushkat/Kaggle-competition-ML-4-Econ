@@ -1,0 +1,502 @@
+---
+title: "Presentation"
+author: "Tom Mushkat"
+date: "5/25/2020"
+output:
+   html_document:
+     code_foldin: hide
+  
+     
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# libraries 
+```{r, warning=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(DataExplorer)
+library(skimr)
+library(vip)
+library(doParallel)     # for working several cors together
+cl <- makeCluster(4)   # for working several cors together
+registerDoParallel(cl) # for working several cors together
+set.seed(2)
+```
+
+# Loading train and test data
+```{r, warning=FALSE}
+Train <- read_csv('D:\\Tom\\Ex\\Kaggle\\train.csv')
+Test <- read_csv('D:\\Tom\\Ex\\Kaggle\\test.csv')
+```
+
+# Exploring data
+```{r, warning=FALSE}
+head(Train)
+tail(Train)
+summary(Train)
+glimpse(Train)
+skim(Train)
+
+#DataExplorer::create_report(Train)
+
+
+plot_boxplot(Train, by = "lnwage")
+plot_histogram(Train)
+
+Train %>%
+  group_by(black) %>%
+  summarise(Mean = mean(lnwage)) 
+
+Train %>%
+  group_by(msa) %>%
+  summarise(Mean = mean(lnwage)) 
+
+
+Train %>%
+  group_by(hisp) %>%
+  summarise(Mean = mean(lnwage)) 
+
+Train %>%
+  group_by(otherrace) %>%
+  summarise(Mean = mean(lnwage))
+
+Train %>%
+  mutate(otherrace.1 = ifelse(black == 0 & hisp == 0, 1, 0)) %>%
+  group_by(otherrace.1) %>%
+  summarise(Mean = mean(lnwage))
+
+Train %>%
+  group_by(northeast) %>%
+  summarise(Mean = mean(lnwage))
+
+Train %>%
+  group_by(northcentral) %>%
+  summarise(Mean = mean(lnwage))
+
+Train %>%
+  group_by(south) %>%
+  summarise(Mean = mean(lnwage))
+```
+
+# Recepie 
+
+```{r, warning=FALSE}
+#Quality_split <- Train %>% 
+#  initial_split(prop = 0.75, strata = female)
+
+#Quality_train <- training(Quality_split)
+#Quality_test  <- testing(Quality_split)
+
+Quality_folds <- Train %>% 
+  vfold_cv(v = 10, repet = 10, strata = female)
+
+
+Quality_rec <- 
+  recipe(lnwage ~ ., data = Train) %>%
+    #step_mutate(otherrace = ifelse(black == 0 & hisp == 0, 1, 0)) %>%
+    #step_mutate(south = ifelse(northeast == 0 & northcentral == 0, 1, 0)) %>%
+    step_rm(contains("ID")) %>%
+    step_rm(contains("expfsq")) %>%
+    step_rm(contains("exppsq")) %>%
+    #step_rm(contains("black")) %>%
+    #step_rm(contains("hisp")) %>%
+    step_interact(terms =  ~ female:edyrs) %>%
+    step_interact(terms =  ~ south:edyrs) %>%
+    step_interact(terms =  ~ otherrace:edyrs) %>%
+    step_interact(terms =  ~ black:edyrs) %>%
+    step_interact(terms =  ~ northeast:edyrs) %>%
+    step_interact(terms =  ~ northcentral:edyrs) %>%
+    step_interact(terms =  ~ female:msa) %>%
+    step_interact(terms =  ~ south:msa) %>%
+    step_interact(terms =  ~ otherrace:msa) %>%
+    step_interact(terms =  ~ black:msa) %>%
+    step_interact(terms =  ~ northeast:msa) %>%
+    step_interact(terms =  ~ northcentral:msa) %>% 
+    step_interact(terms =  ~ colldeg:msa) %>%  
+    step_interact(terms =  ~ advdeg:msa) %>%  
+    step_interact(terms =  ~ female:expf) %>%
+    step_interact(terms =  ~ south:expf) %>%
+    step_interact(terms =  ~ otherrace:expf) %>%
+    step_interact(terms =  ~ colldeg:expf) %>%
+    step_interact(terms =  ~ advdeg:expf) %>%
+    step_interact(terms =  ~ black:expf) %>%
+    step_interact(terms =  ~ hisp:expf) %>%
+    step_interact(terms =  ~ northeast:expf) %>%
+    step_interact(terms =  ~ northcentral:expf) %>%
+    step_interact(terms =  ~ female:expp) %>%
+    step_interact(terms =  ~ south:expp) %>%
+    step_interact(terms =  ~ otherrace:expp) %>%
+    step_interact(terms =  ~ colldeg:expp) %>%
+    step_interact(terms =  ~ advdeg:expp) %>%
+    step_interact(terms =  ~ black:expp) %>%
+    step_interact(terms =  ~ hisp:expp) %>%
+    step_interact(terms =  ~ northeast:expp) %>%
+    step_interact(terms =  ~ northcentral:expp) %>%
+    step_interact(terms =  ~ female:south) %>%
+    step_interact(terms =  ~ female:otherrace) %>%
+    step_interact(terms =  ~ female:colldeg) %>%
+    step_interact(terms =  ~ female:advdeg) %>%
+    step_interact(terms =  ~ black:female) %>%
+    step_interact(terms =  ~ hisp:female) %>%
+    step_interact(terms =  ~ northeast:female) %>%
+    step_interact(terms =  ~ northcentral:female) %>%
+    step_interact(terms =  ~ south:otherrace) %>%
+    step_interact(terms =  ~ south:colldeg) %>%
+    step_interact(terms =  ~ south:advdeg) %>%
+    step_interact(terms =  ~ black:south) %>%
+    step_interact(terms =  ~ hisp:south) %>%
+    step_interact(terms =  ~ otherrace:colldeg) %>%
+    step_interact(terms =  ~ otherrace:advdeg) %>%
+    step_interact(terms =  ~ otherrace:northeast) %>%
+    step_interact(terms =  ~ otherrace:northcentral) %>%
+    step_interact(terms =  ~ female:south:otherrace) %>%
+    step_interact(terms =  ~ female:northeast:otherrace) %>%
+    step_interact(terms =  ~ female:northcentral:otherrace) %>%
+    step_interact(terms =  ~ female:south:msa) %>%
+    step_interact(terms =  ~ female:northeast:msa) %>%
+    step_interact(terms =  ~ female:northcentral:msa) %>%
+    step_interact(terms =  ~ female:south:black) %>%
+    step_interact(terms =  ~ female:northeast:black) %>%
+    step_interact(terms =  ~ female:northcentral:black) %>%
+    step_interact(terms =  ~ female:south:hisp) %>%
+    step_interact(terms =  ~ female:northeast:hisp) %>%
+    step_interact(terms =  ~ female:northcentral:hisp) %>% 
+    step_interact(terms =  ~ female:south:colldeg) %>%
+    step_interact(terms =  ~ female:south:advdeg) %>%
+    step_interact(terms =  ~ female:otherrace:colldeg) %>%
+    step_interact(terms =  ~ female:otherrace:advdeg) %>%
+    step_interact(terms =  ~ south:otherrace:colldeg) %>%
+    step_interact(terms =  ~ south:otherrace:advdeg) %>%
+    step_interact(terms =  ~ female:south:otherrace:colldeg) %>%
+    step_interact(terms =  ~ female:south:otherrace:advdeg) %>%
+    step_interact(terms =  ~ female:south:black:colldeg) %>%
+    step_interact(terms =  ~ female:south:black:advdeg) %>%
+    step_interact(terms =  ~ female:south:hisp:colldeg) %>%
+    step_interact(terms =  ~ female:south:hisp:advdeg) %>%
+    step_interact(terms =  ~ female:northeast:otherrace:colldeg) %>%
+    step_interact(terms =  ~ female:northeast:otherrace:advdeg) %>%
+    step_interact(terms =  ~ female:northeast:black:colldeg) %>%
+    step_interact(terms =  ~ female:northeast:black:advdeg) %>%
+    step_interact(terms =  ~ female:northeast:hisp:colldeg) %>%
+    step_interact(terms =  ~ female:northeast:hisp:advdeg) %>%
+    step_interact(terms =  ~ female:northcentral:otherrace:colldeg) %>%
+    step_interact(terms =  ~ female:northcentral:otherrace:advdeg) %>%
+    step_interact(terms =  ~ female:northcentral:black:colldeg) %>%
+    step_interact(terms =  ~ female:northcentral:black:advdeg) %>%
+    step_interact(terms =  ~ female:northcentral:hisp:colldeg) %>%
+    step_interact(terms =  ~ female:northcentral:hisp:advdeg) %>%
+    step_poly(expf, expp, edyrs) %>%
+    step_center(all_predictors()) %>% 
+    step_scale(all_predictors()) %>% 
+    step_zv(all_predictors())  
+
+Prep <- prep(Quality_rec)
+
+test_baked  <- bake(Prep, new_data = Test)
+
+Juiced <- juice(Prep)
+
+```
+
+
+# Elastic net
+
+```{r, warning=FALSE}
+lm_spec <- linear_reg() %>% 
+  set_args(penalty = tune(), mixture = tune(), nlambda = 50) %>% 
+  set_engine("glmnet") %>% 
+  set_mode("regression") 
+
+lm_wfl <- workflow() %>% 
+  add_recipe(Quality_rec) %>% 
+  add_model(lm_spec)
+
+doParallel::registerDoParallel()
+
+lm_grid <- tune_grid(lm_wfl,
+                     resamples = Quality_folds,
+                     grid = 50)
+
+
+
+lmfirst_grid <- lm_grid %>% collect_metrics() 
+
+
+lm_grid %>%
+  collect_metrics() %>%
+  filter(.metric == 'rmse') %>%
+  select(mean, penalty, mixture) %>%
+  pivot_longer(penalty:mixture,
+               values_to = "value",
+               names_to = "parameter") %>%
+  ggplot(aes(value, mean, color = parameter)) + 
+  geom_point(show.legend = FALSE) + 
+  facet_wrap(~ parameter, scales = 'free_x')
+
+
+myLmGrid <- grid_regular(
+  penalty(range = c(0, 0.2)),
+       mixture(range = c(0, 1)),
+       levels = 50
+)
+  
+
+doParallel::registerDoParallel()
+
+regular_results <- tune_grid(lm_wfl,
+                     resamples = Quality_folds,
+                     grid = myLmGrid)
+
+lm_grid %>%
+  collect_metrics() %>%
+  filter(.metric == 'rmse') %>%
+  mutate(penalty = penalty) %>%
+  ggplot(aes(mixture, mean, color = penalty)) +
+  geom_line(alpha = 0.5, size = 1.5) + 
+  geom_point()
+
+
+regular_results %>%
+  collect_metrics() %>%
+  filter(.metric == 'rmse') %>%
+  mutate(penalty = penalty) %>%
+  ggplot(aes(mixture, mean, color = penalty)) +
+  geom_line(alpha = 0.5, size = 1.5) + 
+  geom_point()
+
+
+best_rmse <- select_by_one_std_err(lm_grid, penalty, mixture, metric = 'rmse')
+best_rmseRedular <- select_by_one_std_err(regular_results,  penalty, mixture, metric ='rmse')
+
+final_lm <- finalize_model(
+  lm_spec,
+  best_rmse
+)
+final_lm2 <- finalize_model(
+  lm_spec,
+  best_rmseRedular
+)
+
+
+final_lm %>%
+  set_engine('glmnet', importance = 'permutation') %>%
+  fit(lnwage ~ .,
+      data = Juiced) %>%
+  vip(geom = 'point')
+
+final_lm2 %>%
+  set_engine('glmnet', importance = 'permutation') %>%
+  fit(lnwage ~ .,
+      data = Juiced) %>%
+  vip(geom = 'point')
+
+
+
+final_wf <- workflow() %>%
+  add_recipe(Quality_rec) %>%
+  add_model(final_lm)
+final_wf2 <- workflow() %>%
+  add_recipe(Quality_rec) %>%
+  add_model(final_lm2)
+
+
+
+#Quality_test_results <- final_wf %>%
+#  last_fit(Quality_split)
+#Quality_test_results2 <- final_wf2 %>%
+#  last_fit(Quality_split)
+
+
+#Quality_test_results %>% collect_metrics()
+#Quality_test_results2 %>% collect_metrics()
+
+
+#elastic_results <- Quality_test_results %>% 
+#  collect_metrics() %>% 
+#  filter(.metric == "rmse") %>% 
+#  mutate(method = "elasticnet")
+```
+
+# Random forests
+
+```{r}
+# Tree_spec <- rand_forest(mtry = tune(), trees = 1000, min_n = tune()) %>% 
+#   set_engine("ranger", importance = "impurity_corrected") %>% 
+#   set_mode("regression")
+# 
+# 
+# Tree_wfl <- workflow() %>% 
+#   add_recipe(Quality_rec) %>% 
+#   add_model(Tree_spec)
+# 
+# 
+# #Quality_folds <- vfold_cv(Quality_train, prop = 0.7, strata = female)
+# doParallel::registerDoParallel()
+# 
+# rf_grid <- tune_grid(Tree_wfl,
+#                      resamples = Quality_folds,
+#                      grid = 20)
+# 
+# 
+# rf_grid %>% collect_metrics() 
+# 
+# rf_grid %>% select_best('rmse')
+# 
+# rf_grid %>%
+#   collect_metrics() %>%
+#   filter(.metric == 'rmse') %>%
+#   select(mean, min_n, mtry) %>%
+#   pivot_longer(min_n:mtry,
+#                values_to = "value",
+#                names_to = "parameter") %>%
+#   ggplot(aes(value, mean, color = parameter)) + 
+#   geom_point(show.legend = FALSE) + 
+#   facet_wrap(~ parameter, scales = 'free_x')
+# # lower vakues min n ; higier values of mtry
+# 
+# myGrid <- grid_regular(
+#   mtry(range = c(20, 40)),
+#        min_n(range = c(2, 30)),
+#        levels = 20
+# )
+#   
+# 
+# doParallel::registerDoParallel()
+# 
+# regular_resultsrf <- tune_grid(Tree_wfl,
+#                      resamples = Quality_folds,
+#                      grid = myGrid)
+# 
+# regular_resultsrf %>%
+#   collect_metrics() %>%
+#   filter(.metric == 'rmse') %>%
+#   mutate(min_n = factor(min_n)) %>%
+#   ggplot(aes(mtry, mean, color = min_n)) +
+#   geom_line(alpha = 0.5, size = 1.5) + 
+#   geom_point()
+# 
+# 
+# rfbest_rmse <- select_best(regular_resultsrf, 'rmse')
+# final_rf <- finalize_model(
+#   Tree_spec,
+#   rfbest_rmse
+# )
+# 
+# final_rf %>%
+#   set_engine('ranger', importance = 'permutation') %>%
+#   fit(lnwage ~ .,
+#       data = juice(Prep)) %>%
+#   vip(geom = 'point')
+# 
+# 
+# final_rfwf <- workflow() %>%
+#   add_recipe(Quality_rec) %>%
+#   add_model(final_rf)
+# 
+# finishrf <- final_rfwf %>%
+#   last_fit(Quality_split)
+```
+
+
+# xgboooooooooooooooooooost
+
+```{r, warning=FALSE}
+# xgb_spce <- boost_tree(
+#   trees = 2000,
+#   tree_depth = tune(),
+#   min_n = tune(),
+#   loss_reduction = tune(),
+#   sample_size = tune(),
+#   mtry = tune(),
+#   learn_rate = tune()) %>%
+#   set_engine('xgboost') %>%
+#   set_mode('regression')
+# 
+# 
+# xgb_wfl <- workflow() %>% 
+#   add_recipe(Quality_rec) %>% 
+#   add_model(xgb_spce)
+# 
+# 
+# doParallel::registerDoParallel()
+# 
+# xgb_grid <- tune_grid(xgb_wfl,
+#                      resamples = Quality_folds,
+#                      grid = 50)
+# 
+# 
+# xgb_grid %>%
+#   collect_metrics() %>%
+#   filter(.metric == "rmse") %>%
+#   select(mean, mtry:sample_size) %>%
+#   pivot_longer(mtry:sample_size,
+#                names_to = "parameter",
+#                values_to = "value") %>%
+#   ggplot(aes(value, mean, color = parameter)) + 
+#   geom_point(show.legend = FALSE) + 
+#   facet_wrap(~parameter, scales = 'free_x')
+# 
+# 
+# xgb_param_final <- select_by_one_std_err(xgb_grid,
+#                                         mtry, sample_size, loss_reduction, learn_rate, tree_depth,
+#                                         metric = "rmse")
+# 
+# final_xgboost <- finalize_model(
+#   xgb_spce,
+#   xgb_param_final
+# )
+# 
+# final_xgboost %>%
+#   set_engine('xgboost', importance = 'permutation') %>%
+#   fit(lnwage ~ .,
+#       data = juice(Prep)) %>%
+#   vip(geom = 'point')
+# 
+# final_XGBwf <- workflow() %>%
+#   add_recipe(Quality_rec) %>%
+#   add_model(final_xgboost)
+# 
+# 
+# 
+# xgb_wflow_final <- finalize_workflow(xgb_wfl, xgb_param_final)
+# 
+# xgb_wflow_final_fit <- fit(xgb_wflow_final, data = Train)
+# 
+# xgb_final_fit <- pull_workflow_fit(xgb_wflow_final_fit)
+# 
+# test_baked$.pred <- predict(xgb_final_fit, 
+#                           new_data = test_baked)
+# Final1 <- data.frame(ID = Test$ID, lwage = test_baked$.pred)
+
+```
+
+ 
+
+
+# Parameters' comparisons
+
+```{r, warning=FALSE}
+best_rmse
+best_rmseRedular
+```
+
+
+# Finalize
+ 
+```{r, warning=FALSE}
+ 
+lm_wflow_final <- finalize_workflow(final_wf, best_rmse)
+
+lm_wflow_final_fit <- fit(lm_wflow_final, data = Train)
+ 
+lm_final_fit <- pull_workflow_fit(lm_wflow_final_fit)
+ 
+test_baked$.pred <- predict(lm_final_fit, 
+                           new_data = test_baked)
+Final1 <- data.frame(ID = Test$ID, lwage = test_baked$.pred)
+```
+
+

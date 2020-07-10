@@ -1,5 +1,5 @@
 ---
-title: "Presentation"
+title: "Kaggle competition"
 author: "Tom Mushkat"
 date: "5/25/2020"
 output:
@@ -20,9 +20,9 @@ library(tidymodels)
 library(DataExplorer)
 library(skimr)
 library(vip)
-library(doParallel)     # for working several cors together
-cl <- makeCluster(4)   # for working several cors together
-registerDoParallel(cl) # for working several cors together
+library(doParallel)     
+cl <- makeCluster(4)   
+registerDoParallel(cl) 
 set.seed(2)
 ```
 
@@ -40,7 +40,7 @@ summary(Train)
 glimpse(Train)
 skim(Train)
 
-#DataExplorer::create_report(Train)
+DataExplorer::create_report(Train)
 
 
 plot_boxplot(Train, by = "lnwage")
@@ -84,18 +84,18 @@ Train %>%
 # Recepie 
 
 ```{r, warning=FALSE}
-#Quality_split <- Train %>% 
-#  initial_split(prop = 0.75, strata = female)
+Quality_split <- Train %>% 
+  initial_split(prop = 0.75, strata = female)
 
-#Quality_train <- training(Quality_split)
-#Quality_test  <- testing(Quality_split)
+Quality_train <- training(Quality_split)
+Quality_test  <- testing(Quality_split)
 
 Quality_folds <- Train %>% 
   vfold_cv(v = 10, repet = 10, strata = female)
 
 
 Quality_rec <- 
-  recipe(lnwage ~ ., data = Train) %>%
+  recipe(lnwage ~ ., data = Quality_train) %>%
     #step_mutate(otherrace = ifelse(black == 0 & hisp == 0, 1, 0)) %>%
     #step_mutate(south = ifelse(northeast == 0 & northcentral == 0, 1, 0)) %>%
     step_rm(contains("ID")) %>%
@@ -195,9 +195,12 @@ Quality_rec <-
 
 Prep <- prep(Quality_rec)
 
-test_baked  <- bake(Prep, new_data = Test)
+test_baked  <- bake(Prep, new_data = Quality_test)
 
 Juiced <- juice(Prep)
+
+
+test_bakedFinal  <- bake(Prep, new_data = Test)
 
 ```
 
@@ -323,153 +326,151 @@ final_wf2 <- workflow() %>%
 # Random forests
 
 ```{r}
-# Tree_spec <- rand_forest(mtry = tune(), trees = 1000, min_n = tune()) %>% 
-#   set_engine("ranger", importance = "impurity_corrected") %>% 
-#   set_mode("regression")
-# 
-# 
-# Tree_wfl <- workflow() %>% 
-#   add_recipe(Quality_rec) %>% 
-#   add_model(Tree_spec)
-# 
-# 
-# #Quality_folds <- vfold_cv(Quality_train, prop = 0.7, strata = female)
-# doParallel::registerDoParallel()
-# 
-# rf_grid <- tune_grid(Tree_wfl,
-#                      resamples = Quality_folds,
-#                      grid = 20)
-# 
-# 
-# rf_grid %>% collect_metrics() 
-# 
-# rf_grid %>% select_best('rmse')
-# 
-# rf_grid %>%
-#   collect_metrics() %>%
-#   filter(.metric == 'rmse') %>%
-#   select(mean, min_n, mtry) %>%
-#   pivot_longer(min_n:mtry,
-#                values_to = "value",
-#                names_to = "parameter") %>%
-#   ggplot(aes(value, mean, color = parameter)) + 
-#   geom_point(show.legend = FALSE) + 
-#   facet_wrap(~ parameter, scales = 'free_x')
-# # lower vakues min n ; higier values of mtry
-# 
-# myGrid <- grid_regular(
-#   mtry(range = c(20, 40)),
-#        min_n(range = c(2, 30)),
-#        levels = 20
-# )
-#   
-# 
-# doParallel::registerDoParallel()
-# 
-# regular_resultsrf <- tune_grid(Tree_wfl,
-#                      resamples = Quality_folds,
-#                      grid = myGrid)
-# 
-# regular_resultsrf %>%
-#   collect_metrics() %>%
-#   filter(.metric == 'rmse') %>%
-#   mutate(min_n = factor(min_n)) %>%
-#   ggplot(aes(mtry, mean, color = min_n)) +
-#   geom_line(alpha = 0.5, size = 1.5) + 
-#   geom_point()
-# 
-# 
-# rfbest_rmse <- select_best(regular_resultsrf, 'rmse')
-# final_rf <- finalize_model(
-#   Tree_spec,
-#   rfbest_rmse
-# )
-# 
-# final_rf %>%
-#   set_engine('ranger', importance = 'permutation') %>%
-#   fit(lnwage ~ .,
-#       data = juice(Prep)) %>%
-#   vip(geom = 'point')
-# 
-# 
-# final_rfwf <- workflow() %>%
-#   add_recipe(Quality_rec) %>%
-#   add_model(final_rf)
-# 
-# finishrf <- final_rfwf %>%
-#   last_fit(Quality_split)
+ Tree_spec <- rand_forest(mtry = tune(), trees = 1000, min_n = tune()) %>% 
+   set_engine("ranger", importance = "impurity_corrected") %>% 
+   set_mode("regression")
+ 
+ 
+ Tree_wfl <- workflow() %>% 
+   add_recipe(Quality_rec) %>% 
+   add_model(Tree_spec)
+ 
+ 
+
+ rf_grid <- tune_grid(Tree_wfl,
+                      resamples = Quality_folds,
+                      grid = 20)
+ 
+ 
+ rf_grid %>% collect_metrics() 
+ 
+ rf_grid %>% select_best('rmse')
+ 
+ rf_grid %>%
+   collect_metrics() %>%
+   filter(.metric == 'rmse') %>%
+   select(mean, min_n, mtry) %>%
+   pivot_longer(min_n:mtry,
+                values_to = "value",
+                names_to = "parameter") %>%
+   ggplot(aes(value, mean, color = parameter)) + 
+   geom_point(show.legend = FALSE) + 
+   facet_wrap(~ parameter, scales = 'free_x')
+    #lower vakues min n ; higier values of mtry
+  
+ myGrid <- grid_regular(
+   mtry(range = c(20, 40)),
+        min_n(range = c(2, 30)),
+        levels = 20
+ )
+   
+ 
+ doParallel::registerDoParallel()
+ 
+ regular_resultsrf <- tune_grid(Tree_wfl,
+                      resamples = Quality_folds,
+                      grid = myGrid)
+ 
+ regular_resultsrf %>%
+   collect_metrics() %>%
+   filter(.metric == 'rmse') %>%
+   mutate(min_n = factor(min_n)) %>%
+   ggplot(aes(mtry, mean, color = min_n)) +
+   geom_line(alpha = 0.5, size = 1.5) + 
+   geom_point()
+ 
+ 
+ rfbest_rmse <- select_best(regular_resultsrf, 'rmse')
+ final_rf <- finalize_model(
+   Tree_spec,
+   rfbest_rmse
+ )
+ 
+ final_rf %>%
+   set_engine('ranger', importance = 'permutation') %>%
+   fit(lnwage ~ .,
+       data = juice(Prep)) %>%
+   vip(geom = 'point')
+ 
+ 
+ final_rfwf <- workflow() %>%
+   add_recipe(Quality_rec) %>%
+   add_model(final_rf)
+ 
+ finishrf <- final_rfwf %>%
+   last_fit(Quality_split)
 ```
 
 
 # xgboooooooooooooooooooost
 
 ```{r, warning=FALSE}
-# xgb_spce <- boost_tree(
-#   trees = 2000,
-#   tree_depth = tune(),
-#   min_n = tune(),
-#   loss_reduction = tune(),
-#   sample_size = tune(),
-#   mtry = tune(),
-#   learn_rate = tune()) %>%
-#   set_engine('xgboost') %>%
-#   set_mode('regression')
-# 
-# 
-# xgb_wfl <- workflow() %>% 
-#   add_recipe(Quality_rec) %>% 
-#   add_model(xgb_spce)
-# 
-# 
-# doParallel::registerDoParallel()
-# 
-# xgb_grid <- tune_grid(xgb_wfl,
-#                      resamples = Quality_folds,
-#                      grid = 50)
-# 
-# 
-# xgb_grid %>%
-#   collect_metrics() %>%
-#   filter(.metric == "rmse") %>%
-#   select(mean, mtry:sample_size) %>%
-#   pivot_longer(mtry:sample_size,
-#                names_to = "parameter",
-#                values_to = "value") %>%
-#   ggplot(aes(value, mean, color = parameter)) + 
-#   geom_point(show.legend = FALSE) + 
-#   facet_wrap(~parameter, scales = 'free_x')
-# 
-# 
-# xgb_param_final <- select_by_one_std_err(xgb_grid,
-#                                         mtry, sample_size, loss_reduction, learn_rate, tree_depth,
-#                                         metric = "rmse")
-# 
-# final_xgboost <- finalize_model(
-#   xgb_spce,
-#   xgb_param_final
-# )
-# 
-# final_xgboost %>%
-#   set_engine('xgboost', importance = 'permutation') %>%
-#   fit(lnwage ~ .,
-#       data = juice(Prep)) %>%
-#   vip(geom = 'point')
-# 
-# final_XGBwf <- workflow() %>%
-#   add_recipe(Quality_rec) %>%
-#   add_model(final_xgboost)
-# 
-# 
-# 
-# xgb_wflow_final <- finalize_workflow(xgb_wfl, xgb_param_final)
-# 
-# xgb_wflow_final_fit <- fit(xgb_wflow_final, data = Train)
-# 
-# xgb_final_fit <- pull_workflow_fit(xgb_wflow_final_fit)
-# 
-# test_baked$.pred <- predict(xgb_final_fit, 
-#                           new_data = test_baked)
-# Final1 <- data.frame(ID = Test$ID, lwage = test_baked$.pred)
+ xgb_spce <- boost_tree(
+   trees = 2000,
+   tree_depth = tune(),
+   min_n = tune(),
+   loss_reduction = tune(),
+   sample_size = tune(),
+   mtry = tune(),
+   learn_rate = tune()) %>%
+   set_engine('xgboost') %>%
+   set_mode('regression')
+ 
+ 
+ xgb_wfl <- workflow() %>% 
+   add_recipe(Quality_rec) %>% 
+   add_model(xgb_spce)
+ 
+ 
+ doParallel::registerDoParallel()
+ 
+ xgb_grid <- tune_grid(xgb_wfl,
+                      resamples = Quality_folds,
+                      grid = 50)
+ 
+ 
+ xgb_grid %>%
+   collect_metrics() %>%
+   filter(.metric == "rmse") %>%
+   select(mean, mtry:sample_size) %>%
+   pivot_longer(mtry:sample_size,
+                names_to = "parameter",
+                values_to = "value") %>%
+   ggplot(aes(value, mean, color = parameter)) + 
+   geom_point(show.legend = FALSE) + 
+   facet_wrap(~parameter, scales = 'free_x')
+ 
+ 
+ xgb_param_final <- select_by_one_std_err(xgb_grid,
+                                         mtry, sample_size, loss_reduction, learn_rate, tree_depth,
+                                         metric = "rmse")
+ 
+ final_xgboost <- finalize_model(
+   xgb_spce,
+   xgb_param_final
+ )
+ 
+ final_xgboost %>%
+   set_engine('xgboost', importance = 'permutation') %>%
+   fit(lnwage ~ .,
+       data = juice(Prep)) %>%
+   vip(geom = 'point')
+ 
+ final_XGBwf <- workflow() %>%
+   add_recipe(Quality_rec) %>%
+   add_model(final_xgboost)
+ 
+ 
+ 
+ xgb_wflow_final <- finalize_workflow(xgb_wfl, xgb_param_final)
+ 
+ xgb_wflow_final_fit <- fit(xgb_wflow_final, data = Train)
+ 
+ xgb_final_fit <- pull_workflow_fit(xgb_wflow_final_fit)
+ 
+ test_baked$.pred <- predict(xgb_final_fit, 
+                           new_data = test_baked)
+ Final1 <- data.frame(ID = Test$ID, lwage = test_baked$.pred)
 
 ```
 
@@ -481,6 +482,10 @@ final_wf2 <- workflow() %>%
 ```{r, warning=FALSE}
 best_rmse
 best_rmseRedular
+
+rfbest_rmse
+
+xgb_param_final
 ```
 
 
@@ -488,15 +493,20 @@ best_rmseRedular
  
 ```{r, warning=FALSE}
  
-lm_wflow_final <- finalize_workflow(final_wf, best_rmse)
+wflow_final <- finalize_workflow(xgb_wfl, xgb_param_final)
 
-lm_wflow_final_fit <- fit(lm_wflow_final, data = Train)
+lwflow_final_fit <- fit(wflow_final, data = Quality_train)
  
-lm_final_fit <- pull_workflow_fit(lm_wflow_final_fit)
+final_fit <- pull_workflow_fit(lwflow_final_fit)
  
-test_baked$.pred <- predict(lm_final_fit, 
+test_baked$.pred <- predict(final_fit, 
                            new_data = test_baked)
-Final1 <- data.frame(ID = Test$ID, lwage = test_baked$.pred)
+preFinal <- data.frame(ID = Test$ID, lwage = test_baked$.pred)
+
+
+test_bakedFinal$.pred <- predict(final_fit, 
+                           new_data = test_bakedFinal)
+preFinal <- data.frame(ID = Test$ID, lwage = test_bakedFinal$.pred)
 ```
 
 
